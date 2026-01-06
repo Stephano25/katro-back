@@ -52,13 +52,10 @@ export class KatroService {
   play(row: number, col: number): GameState {
     if (this.state.gameOver) return this.state;
 
-    // Nouvelle vérification : joueur peut commencer dans n’importe quelle case de son camp
-    if (this.state.currentPlayer === 0 && !(row === 0 || row === 1)) {
-    return this.state; // joueur 1 ne peut jouer que dans rangées 0 et 1
-    }
-    if (this.state.currentPlayer === 1 && !(row === 2 || row === 3)) {
-    return this.state; // joueur 2 ne peut jouer que dans rangées 2 et 3
-    }
+    // ✅ Vérifier que le joueur joue dans son camp (rangées 0-1 pour J1, 2-3 pour J2)
+    if (this.state.currentPlayer === 0 && !(row === 0 || row === 1)) return this.state;
+    if (this.state.currentPlayer === 1 && !(row === 2 || row === 3)) return this.state;
+
     let seeds = this.state.board[row][col];
     if (seeds === 0) return this.state;
 
@@ -69,19 +66,11 @@ export class KatroService {
     // ✅ Distribution confinée au camp du joueur
     while (seeds > 0) {
       if (this.state.currentPlayer === 0) {
-        // Joueur 1 : circule entre rangées 0 et 1
         c--;
-        if (c < 0) {
-          r = r === 0 ? 1 : 0;
-          c = 3;
-        }
+        if (c < 0) { r = r === 0 ? 1 : 0; c = 3; }
       } else {
-        // Joueur 2 : circule entre rangées 2 et 3
         c++;
-        if (c > 3) {
-          r = r === 3 ? 2 : 3;
-          c = 0;
-        }
+        if (c > 3) { r = r === 3 ? 2 : 3; c = 0; }
       }
       this.state.board[r][c]++;
       this.state.lastMove.path.push({ row: r, col: c });
@@ -90,7 +79,7 @@ export class KatroService {
 
     this.state.lastMove.end = { row: r, col: c };
 
-    // ✅ Capture conditionnelle
+    // ✅ Capture conditionnelle avec transfert
     if ((r === 0 && this.state.currentPlayer === 0) || (r === 3 && this.state.currentPlayer === 1)) {
       const captureRow = r;
       const oppositeRow = r === 0 ? 3 : 0;
@@ -99,7 +88,9 @@ export class KatroService {
       // D’abord prendre la case "devant"
       if (this.state.board[captureRow][captureCol] > 1 &&
           this.state.board[oppositeRow][captureCol] > 0) {
-        this.state.scores[this.state.currentPlayer] += this.state.board[oppositeRow][captureCol];
+        const capturedSeeds = this.state.board[oppositeRow][captureCol];
+        const targetRow = this.state.currentPlayer === 0 ? 1 : 2; // rangée intérieure du joueur
+        this.state.board[targetRow][captureCol] += capturedSeeds;
         this.state.lastMove.captured.push({ row: oppositeRow, col: captureCol });
         this.state.board[oppositeRow][captureCol] = 0;
 
@@ -108,14 +99,15 @@ export class KatroService {
         if (captureCol >= 0 && captureCol < 4 &&
             this.state.board[captureRow][captureCol] > 1 &&
             this.state.board[oppositeRow][captureCol] > 0) {
-          this.state.scores[this.state.currentPlayer] += this.state.board[oppositeRow][captureCol];
+          const capturedSeeds2 = this.state.board[oppositeRow][captureCol];
+          this.state.board[targetRow][captureCol] += capturedSeeds2;
           this.state.lastMove.captured.push({ row: oppositeRow, col: captureCol });
           this.state.board[oppositeRow][captureCol] = 0;
         }
       }
     }
 
-     // Changer de joueur
+    // ✅ Changer de joueur
     this.state.currentPlayer = this.state.currentPlayer === 0 ? 1 : 0;
 
     // ✅ Fin du jeu : si un joueur n’a plus qu’une seule graine au total
