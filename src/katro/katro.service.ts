@@ -52,12 +52,13 @@ export class KatroService {
   play(row: number, col: number): GameState {
     if (this.state.gameOver) return this.state;
 
-    // Vérifier que le joueur joue dans sa rangée extérieure
-    if ((this.state.currentPlayer === 0 && row !== 0) ||
-        (this.state.currentPlayer === 1 && row !== 3)) {
-      return this.state;
+    // Nouvelle vérification : joueur peut commencer dans n’importe quelle case de son camp
+    if (this.state.currentPlayer === 0 && !(row === 0 || row === 1)) {
+    return this.state; // joueur 1 ne peut jouer que dans rangées 0 et 1
     }
-
+    if (this.state.currentPlayer === 1 && !(row === 2 || row === 3)) {
+    return this.state; // joueur 2 ne peut jouer que dans rangées 2 et 3
+    }
     let seeds = this.state.board[row][col];
     if (seeds === 0) return this.state;
 
