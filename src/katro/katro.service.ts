@@ -1,72 +1,132 @@
 import { Injectable } from '@nestjs/common';
 
-type Player = 0 | 1;
+export interface CellPos { row: number; col: number; }
+export interface LastMove {
+  start: CellPos;
+  end: CellPos;
+  path: CellPos[];
+  captured: CellPos[];
+}
+export interface GameState {
+  board: number[][];
+  scores: number[];
+  currentPlayer: number;
+  gameOver: boolean;
+  lastMove: LastMove;
+}
 
 @Injectable()
 export class KatroService {
-  board = [
-    [2, 2, 2, 2], // haut
-    [2, 2, 2, 2], // bas
-  ];
-
-  currentPlayer: Player = 1;
-  scores: number[] = [0, 0];
-  gameOver = false;
-
-  getState() {
-    return {
-      board: this.board,
-      scores: this.scores,
-      currentPlayer: this.currentPlayer,
-      gameOver: this.gameOver,
-    };
+  private initialBoard(): number[][] {
+    return [
+      Array(4).fill(2), // Rangée extérieure Haut (J1)
+      Array(4).fill(2), // Rangée intérieure Haut (J1)
+      Array(4).fill(2), // Rangée intérieure Bas (J2)
+      Array(4).fill(2), // Rangée extérieure Bas (J2)
+    ];
   }
-  play(row: number, col: number) {
-    if (this.gameOver) return this.getState();
-    if (row !== this.currentPlayer) return this.getState();
 
-    let seeds = this.board[row][col];
-    if (seeds === 0) return this.getState();
+  private state: GameState = {
+    board: this.initialBoard(),
+    scores: [0, 0],
+    currentPlayer: 0,
+    gameOver: false,
+    lastMove: { start: { row: -1, col: -1 }, end: { row: -1, col: -1 }, path: [], captured: [] },
+  };
 
-    this.board[row][col] = 0;
-    let r = row;
-    let c = col;
+  getState(): GameState {
+    return this.state;
+  }
 
-    // sens trigonométrique
+  reset(): GameState {
+    this.state = {
+      board: this.initialBoard(),
+      scores: [0, 0],
+      currentPlayer: 0,
+      gameOver: false,
+      lastMove: { start: { row: -1, col: -1 }, end: { row: -1, col: -1 }, path: [], captured: [] },
+    };
+    return this.state;
+  }
+
+  play(row: number, col: number): GameState {
+    if (this.state.gameOver) return this.state;
+
+    // Vérifier que le joueur joue dans sa rangée extérieure
+    if ((this.state.currentPlayer === 0 && row !== 0) ||
+        (this.state.currentPlayer === 1 && row !== 3)) {
+      return this.state;
+    }
+
+    let seeds = this.state.board[row][col];
+    if (seeds === 0) return this.state;
+
+    this.state.lastMove = { start: { row, col }, end: { row: -1, col: -1 }, path: [], captured: [] };
+    this.state.board[row][col] = 0;
+    let r = row, c = col;
+
+    // ✅ Distribution confinée au camp du joueur
     while (seeds > 0) {
-      if (r === 1) c++;
-      else c--;
-
-      if (c > 3) {
-        r = 0;
-        c = 3;
+      if (this.state.currentPlayer === 0) {
+        // Joueur 1 : circule entre rangées 0 et 1
+        c--;
+        if (c < 0) {
+          r = r === 0 ? 1 : 0;
+          c = 3;
+        }
+      } else {
+        // Joueur 2 : circule entre rangées 2 et 3
+        c++;
+        if (c > 3) {
+          r = r === 3 ? 2 : 3;
+          c = 0;
+        }
       }
-      if (c < 0) {
-        r = 1;
-        c = 0;
-      }
-      this.board[r][c]++;
+      this.state.board[r][c]++;
+      this.state.lastMove.path.push({ row: r, col: c });
       seeds--;
     }
 
-    // capture officielle katro
-    const cr = r;
-    let cc = c;
-    while (
-      cr !== this.currentPlayer &&
-      (this.board[cr][cc] === 2 || this.board[cr][cc] === 3)
-    ) {
-      this.scores[this.currentPlayer] += this.board[cr][cc];
-      this.board[cr][cc] = 0;
-      cc--;
-      if (cc < 0) break;
+    this.state.lastMove.end = { row: r, col: c };
+
+    // ✅ Capture conditionnelle
+    if ((r === 0 && this.state.currentPlayer === 0) || (r === 3 && this.state.currentPlayer === 1)) {
+      const captureRow = r;
+      const oppositeRow = r === 0 ? 3 : 0;
+      let captureCol = c;
+
+      // D’abord prendre la case "devant"
+      if (this.state.board[captureRow][captureCol] > 1 &&
+          this.state.board[oppositeRow][captureCol] > 0) {
+        this.state.scores[this.state.currentPlayer] += this.state.board[oppositeRow][captureCol];
+        this.state.lastMove.captured.push({ row: oppositeRow, col: captureCol });
+        this.state.board[oppositeRow][captureCol] = 0;
+
+        // Ensuite avancer et prendre la case "derrière"
+        captureCol += r === 0 ? -1 : 1;
+        if (captureCol >= 0 && captureCol < 4 &&
+            this.state.board[captureRow][captureCol] > 1 &&
+            this.state.board[oppositeRow][captureCol] > 0) {
+          this.state.scores[this.state.currentPlayer] += this.state.board[oppositeRow][captureCol];
+          this.state.lastMove.captured.push({ row: oppositeRow, col: captureCol });
+          this.state.board[oppositeRow][captureCol] = 0;
+        }
+      }
     }
 
-    this.currentPlayer = this.currentPlayer === 0 ? 1 : 0;
+     // Changer de joueur
+    this.state.currentPlayer = this.state.currentPlayer === 0 ? 1 : 0;
 
-    const remaining = this.board.flat().reduce((a, b) => a + b, 0);
-    if (remaining <= 1) this.gameOver = true;
+    // ✅ Fin du jeu : si un joueur n’a plus qu’une seule graine au total
+    const totalPlayer1 = this.state.board[0].reduce((a, b) => a + b, 0) +
+                         this.state.board[1].reduce((a, b) => a + b, 0);
+    const totalPlayer2 = this.state.board[2].reduce((a, b) => a + b, 0) +
+                         this.state.board[3].reduce((a, b) => a + b, 0);
 
-    return this.getState();
+    if (totalPlayer1 === 1 || totalPlayer2 === 1) {
+      this.state.gameOver = true;
+    }
+
+    return this.state;
   }
 }
