@@ -52,7 +52,7 @@ export class KatroService {
   play(row: number, col: number): GameState {
     if (this.state.gameOver) return this.state;
 
-    // ✅ Vérifier que le joueur joue dans son camp (rangées 0-1 pour J1, 2-3 pour J2)
+    //Vérifier que le joueur joue dans son camp (rangées 0-1 pour J1, 2-3 pour J2)
     if (this.state.currentPlayer === 0 && !(row === 0 || row === 1)) return this.state;
     if (this.state.currentPlayer === 1 && !(row === 2 || row === 3)) return this.state;
 
@@ -63,7 +63,7 @@ export class KatroService {
     this.state.board[row][col] = 0;
     let r = row, c = col;
 
-    // ✅ Distribution confinée au camp du joueur
+    //Distribution confinée au camp du joueur
     while (seeds > 0) {
       if (this.state.currentPlayer === 0) {
         c--;
@@ -79,7 +79,7 @@ export class KatroService {
 
     this.state.lastMove.end = { row: r, col: c };
 
-    // ✅ Capture conditionnelle avec transfert
+    // Capture conditionnelle avec transfert
     if ((r === 0 && this.state.currentPlayer === 0) || (r === 3 && this.state.currentPlayer === 1)) {
       const captureRow = r;
       const oppositeRow = r === 0 ? 3 : 0;
@@ -107,10 +107,10 @@ export class KatroService {
       }
     }
 
-    // ✅ Changer de joueur
+    // Changer de joueur
     this.state.currentPlayer = this.state.currentPlayer === 0 ? 1 : 0;
 
-    // ✅ Fin du jeu : si un joueur n’a plus qu’une seule graine au total
+    // Fin du jeu : si un joueur n’a plus qu’une seule graine au total
     const totalPlayer1 = this.state.board[0].reduce((a, b) => a + b, 0) +
                          this.state.board[1].reduce((a, b) => a + b, 0);
     const totalPlayer2 = this.state.board[2].reduce((a, b) => a + b, 0) +

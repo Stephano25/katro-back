@@ -11,6 +11,6 @@ async function bootstrap() {
   });
 
   await app.listen(3000);
-  console.log('🚀 Katro backend running on http://localhost:3000');
+  console.log('Katro backend running on http://localhost:3000');
 }
 bootstrap();
